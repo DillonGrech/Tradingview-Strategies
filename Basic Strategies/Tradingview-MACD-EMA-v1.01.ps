@@ -1,0 +1,81 @@
+//---------------------------------------------//
+// This source code is subject to the terms of 
+// the Mozilla Public License 2.0 at 
+// https://mozilla.org/MPL/2.0/
+// © Dillon_Grech
+//---------------------------------------------//
+
+//---------------------------------------------//
+// Simple MACD EMA Strategy which takes trades
+// based off MACD cross and location, and EMA
+// location against price. Exit trades when
+// price crossed EMA line. Strategy buys & sells
+// one contract only.
+//---------------------------------------------//
+
+//@version=5
+strategy(title="MACD EMA", overlay=true)
+//---------------------------------------------//
+
+//---------------------------------------------//
+//INDICATOR 1 - MACD
+fas_len=input.int(12, "Fast Length")
+slo_len=input.int(26, "Slow Length")
+sig_len=input.int(9, "Signal Smoothing", 1, 50)
+
+fas_ma=ta.ema(close, fas_len)
+slo_ma=ta.ema(close, slo_len)
+macd=fas_ma-slo_ma
+sig=ta.ema(macd,sig_len)
+
+Ind_1_L=ta.crossover(macd, sig) and macd<0 and 
+   sig<0
+Ind_1_S=ta.crossunder(macd, sig) and macd>0 and 
+   sig>0
+//---------------------------------------------//
+
+//---------------------------------------------//
+//INDICATOR 2 - EMA
+ema_per=input.int(365, "EMA Period")
+ema=ta.ema(close, ema_per)
+plot(ema, "EMA", color.white, 2)
+
+Ind_2_L=close>ema
+Ind_2_S=close<ema
+//---------------------------------------------//
+
+//---------------------------------------------//
+//ENTRY CONDITIONS
+entry_long=strategy.position_size<=0 and
+   Ind_1_L and Ind_2_L
+entry_short=strategy.position_size>=0 and
+   Ind_1_S and Ind_2_S
+
+plotshape(entry_long, "Long Entry", 
+   shape.arrowup, location.belowbar, color.lime,
+   0, "Buy")
+
+plotshape(entry_short, "Short Entry", 
+   shape.arrowdown, location.abovebar, color.red,
+   0, "Sell")
+
+if(entry_long)
+    strategy.entry("Long Entry", strategy.long,
+       1)
+if(entry_short)
+    strategy.entry("Short Entry", strategy.short,
+       1)
+//---------------------------------------------//
+
+//---------------------------------------------//
+//EXIT CONDITIONS
+exit_long = ta.crossunder(close, ema)
+exit_short = ta.crossover(close, ema)
+
+if(exit_long)
+    strategy.close("Long Entry", 
+       qty_percent=100)
+if(exit_short)
+    strategy.close("Short Entry",
+       qty_percent=100)
+//---------------------------------------------//
