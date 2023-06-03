@@ -1,0 +1,50 @@
+//---------------------------------------------//
+// This source code is subject to the terms of 
+// the Mozilla Public License 2.0 at 
+// https://mozilla.org/MPL/2.0/
+// © Dillon_Grech
+//---------------------------------------------//
+
+//---------------------------------------------//
+// Trading conditions which allows users to 
+// set a date range for trading back testing. 
+//
+// This is important for traders optimising
+// strategies based off specific market periods,
+// or performing in-sample/out-sample or
+// walk-forward analysis testing.
+//
+// Insert code and place "Date_Range()" variable
+// into your entry conditions.
+//
+// Example shown on my Youtube Channel
+//---------------------------------------------//
+
+
+//---------------------------------------------//
+//BACKTEST DATE RANGE - COPY ME
+Start_D = input.int(   1, "Start Day", 1, 31)
+Start_M = input.int(   1, "Start Month", 1, 12)
+Start_Y = input.int(2000, "Start Year")
+End_D   = input.int(   1, "End Day", 1, 31)
+End_M   = input.int(   1, "End Month", 1, 12)
+End_Y   = input.int(2020, "End Year")
+
+Start_Date = timestamp(Start_Y, Start_M, 
+   Start_D, 00, 00, 00)
+End_Date   = timestamp(End_Y,   End_M,   
+   End_D,   23, 59, 59)
+
+//Date Range Condition
+Date_Range() => time >= Start_Date and 
+   time <= End_Date ? true : false
+//---------------------------------------------//
+
+//---------------------------------------------//
+//ENTRY CONDITIONS
+//Copy "Date_Range()" into your entry long and
+//short conditions. Example below:
+
+//entry_long  = MyLongEntry  and Date_Range()
+//entry_short = MyShortEntry and Date_Range()
+//---------------------------------------------//
