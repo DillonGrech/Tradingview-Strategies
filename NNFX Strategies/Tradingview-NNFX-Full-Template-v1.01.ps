@@ -1,0 +1,486 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 
+//at https://mozilla.org/MPL/2.0/
+// © DillonGrech
+//
+//This is a NNFX Strategy Tempate file which can be used to automate your NNFX
+//trading strategy in TradingView. This utilises all NNFX trading conditions
+//from the YouTube Channel No Nonsense Forex. 
+//
+//The strategy has been coded by Dillon Grech as part of his YouTube channel
+//and a detailed video can be found on his channel at:
+//https://www.youtube.com/c/DillonGrech
+//Source code and template files can be found on his GitHub at:
+//https://github.com/Dillon-Grech
+//==============================================================================
+//@version=5
+strategy('NNFX Strategy Template', overlay=true, currency=currency.USD, initial_capital=10000, pyramiding=2)
+
+//==============================================================================
+//INSERT SECTION
+//This section is where users will be required to insert the indicators they
+//would like to use for their NNFX Strategy.
+//==============================================================================
+//INSERT - CONFIRMATION INDICATOR 1
+//==============================================================================
+//Insert indicator variables
+Aroon_length = input.int(14, title="Aroon Length", minval=1)
+Aroon_upper = 100 * (ta.highestbars(high, Aroon_length) + Aroon_length)/Aroon_length
+Aroon_lower = 100 * (ta.lowestbars(low, Aroon_length) + Aroon_length)/Aroon_length
+
+//Insert indicator conditions as Trigger
+C1_L_Trigger = ta.crossover(Aroon_upper,  Aroon_lower)
+C1_S_Trigger = ta.crossunder(Aroon_upper, Aroon_lower)
+
+//Insert indicator conditions as Filter
+C1_L_Filter = Aroon_upper > Aroon_lower
+C1_S_Filter = Aroon_upper < Aroon_lower
+
+//==============================================================================
+//INSERT - CONFIRMATION INDICATOR 2
+//==============================================================================
+//Insert indicator variables
+Dpo_period = input.int(21, title="DPO Length", minval=1)
+Dpo_isCentered = input(false, title="DPO Centered")
+Dpo_barsback = Dpo_period/2 + 1
+Dpo_ma = ta.sma(close, Dpo_period)
+Dpo = Dpo_isCentered ? close[Dpo_barsback] - Dpo_ma : close - Dpo_ma[Dpo_barsback]
+
+//Insert indicator conditions as filter
+C2_L_Filter = Dpo > 0
+C2_S_Filter = Dpo < 0
+
+//==============================================================================
+//INSERT - VOLUME INDICATOR
+//==============================================================================
+//Insert indicator variables
+Adx_Line = input(15, title="ADX Signal Line")
+adxlen = input(14, title="ADX Smoothing")
+dilen = input(14, title="ADX DI Length")
+dirmov(len) =>
+	up = ta.change(high)
+	down = -ta.change(low)
+	plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+	minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+	truerange = ta.rma(ta.tr, len)
+	plus = fixnan(100 * ta.rma(plusDM, len) / truerange)
+	minus = fixnan(100 * ta.rma(minusDM, len) / truerange)
+	[plus, minus]
+adx(dilen, adxlen) =>
+	[plus, minus] = dirmov(dilen)
+	sum = plus + minus
+	adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+Adx_sig = adx(dilen, adxlen)
+
+//Insert indicator conditions as filter
+Vol_L_Filter = Adx_sig > Adx_Line
+Vol_S_Filter = Adx_sig > Adx_Line
+
+//==============================================================================
+//INSERT - BASELINE INDICATOR
+//==============================================================================
+//Insert indicator variables
+Ma_len = input.int(100, minval=1, title="MA Length")
+Ma_src = input(close, title=" MA Source")
+Ma_out = ta.sma(Ma_src, Ma_len)
+
+//Insert indicator as baseline
+Bl = Ma_out
+
+//(do not change) Indicator conditions at end as filter as Trigger
+Bl_L_Trigger = ta.crossover(close,  Bl)
+Bl_S_Trigger = ta.crossunder(close, Bl)
+
+//(do not change) Indicator conditions at end as filter
+Bl_L_Filter = close > Bl
+Bl_S_Filter = close < Bl
+
+//==============================================================================
+//INSERT - EXIT INDICATOR
+//==============================================================================
+//Insert indicator variables
+//Using indicator 1 as exit indicator - no additional indicators to be inserted 
+//in this example. If you wish to use another indicator, insert indicator here.
+
+//Insert indicator conditions as exit trigger - in this example, using C1 as
+//exit indicator. If you wish to use another indicator, insert indicator above,
+//and provide trigger (either crossover or crossunder) conditions here.
+Exit_L = C1_S_Trigger
+Exit_S = C1_L_Trigger
+
+//==============================================================================
+//INSERT - CONTINUATION TRADES INDICATOR
+//==============================================================================
+//Insert indicator variables
+//Using indicator 1 as trigger for continuation trades - no additional 
+//indicators to be inserted in this example. If you wish to use another
+//indicator, insert indicator here. 
+
+//Insert indicator conditions as continuation trigger - in this example, using 
+//C1 as continuation indicator. If you wish to use another indicator, insert  
+//indicator above, and provide trigger (either crossover or crossunder) 
+//conditions here.
+Cont_L_Trigger = C1_L_Trigger
+Cont_S_Trigger = C1_S_Trigger
+
+//==============================================================================
+//COMPLETED SECTION
+//This section has been optimised to work with the above indicators the user
+//has inserted above. The user does not require to change any code below and
+//is completed and optimised for the full NNFX strategy. Users may wish to 
+//customise this section of code if they wish to alter the NNFX strategy.
+//==============================================================================
+//COMPLETE - BACKTEST DATE RANGE
+//==============================================================================
+//Define variables
+Start_D = input.int (   1, "Start Day",   1, 31)
+Start_M = input.int (   1, "Start Month", 1, 12)
+Start_Y = input.int (2004, "Start Year"        )
+End_D   = input.int (   1, "End Day",     1, 31)
+End_M   = input.int (   1, "End Month",   1, 12)
+End_Y   = input.int (2016, "End Year"          )
+
+//Define start and end time stamps
+Start_Date = timestamp(Start_Y, Start_M, Start_D, 00, 00, 00)
+End_Date   = timestamp(End_Y,     End_M,   End_D, 00, 00, 00)
+
+//Date Range Condition
+Date_Range() =>
+    if time >= Start_Date and time <= End_Date
+        true
+    else
+        false
+
+//==============================================================================
+//COMPLETE - CURRENCY CONVERSION
+//==============================================================================
+//Define account currency crosses for possible tradable symbols (Account Currency = USD)
+usdUSDrate = 1
+gbpUSDrate = request.security('GBPUSD', 'D', close[1])
+audUSDrate = request.security('AUDUSD', 'D', close[1])
+nzdUSDrate = request.security('NZDUSD', 'D', close[1])
+cadUSDrate = request.security('CADUSD', 'D', close[1])
+chfUSDrate = request.security('CHFUSD', 'D', close[1])
+eurUSDrate = request.security('EURUSD', 'D', close[1])
+jpyUSDrate = request.security('JPYUSD', 'D', close[1])
+
+//Get quote currency for current symbol
+quoteCurrency = syminfo.currency
+
+//Find quote currency and account currency cross for current symbol
+float cr_multi = switch quoteCurrency
+    "USD" => usdUSDrate
+    "GBP" => gbpUSDrate
+    "AUD" => audUSDrate
+    "NZD" => nzdUSDrate
+    "CAD" => cadUSDrate
+    "CHF" => chfUSDrate
+    "EUR" => eurUSDrate
+    "JPY" => jpyUSDrate
+    =>
+        runtime.error("No matching MA type found.")
+        float(na)
+
+//==============================================================================
+//COMPLETE - ATR MONEY MANAGEMENT
+//==============================================================================
+//Declair money management variables
+Risk_Percent     = input.float(title='Percent Risk Per Trade', defval=0.02, minval=0.001, maxval=1)
+Atr_Multi_Profit = input.float(title='Atr Profit Multiple',    defval=1.0,  minval=0.1)
+Atr_Multi_Loss   = input.float(title='Atr Loss Multiple',      defval=1.5,  minval=0.1)
+
+//ATR indicator
+Atr_length = input.int(title="ATR Length", defval=14, minval=1)
+Atr_smoothing = input.string(title="ATR Smoothing", defval="RMA", options=["RMA", "SMA", "EMA", "WMA"])
+ma_function(source, length) =>
+	switch Atr_smoothing
+		"RMA" => ta.rma(source, length)
+		"SMA" => ta.sma(source, length)
+		"EMA" => ta.ema(source, length)
+		=> ta.wma(source, length)
+
+Atr = ma_function(ta.tr(true), Atr_length)
+
+//Calculate position size based off initial account capital, risk per trade and atr distance
+Position_Size = math.round(strategy.initial_capital * Risk_Percent / (Atr_Multi_Loss * Atr) / cr_multi)
+
+//==============================================================================
+//COMPLETE - USER INPUT CONDITIONS - C1
+//==============================================================================
+//Allow user to select whether they would like to use C1 indicator as trigger
+Input_C1_Trigger = input(true, title='Use C1 as Trigger?')
+
+if Input_C1_Trigger == false
+    C1_L_Trigger := false
+    C1_S_Trigger := false
+
+//Allow user to select whether they would like to use C1 as a filter
+Input_C1_Filter = input(false,title='Use C1 as Filter?')
+
+if Input_C1_Filter == false
+    C1_L_Filter := true
+    C1_S_Filter := true
+
+//==============================================================================
+//COMPLETE - USER INPUT CONDITIONS - C2
+//==============================================================================
+//Allow user to select whether they would like to use C2 as a filter
+Input_C2_Filter = input(true,title='Use C2 as Filter?')
+
+if Input_C2_Filter == false
+    C2_L_Filter := true
+    C2_S_Filter := true
+
+//==============================================================================
+//COMPLETE - USER INPUT CONDITIONS - Vol
+//==============================================================================
+//Allow user to select whether they would like to use C3 as a filter
+Input_Vol_Filter = input(true,title='Use Vol as Filter?')
+
+if Input_Vol_Filter == false
+    Vol_L_Filter := true
+    Vol_S_Filter := true
+
+//==============================================================================
+//COMPLETE - USER INPUT CONDITIONS - Bl
+//==============================================================================
+//Allow user to select whether they would like to use C1 indicator as trigger
+Input_Bl_Trigger = input(false, title='Use BL as Trigger?')
+
+if Input_Bl_Trigger == false
+    Bl_L_Trigger := false
+    Bl_S_Trigger := false
+
+//Allow user to select whether they would like to use BL as a filter
+Input_Bl_Filter = input(true, title='Use BL as Filter?')
+
+if Input_Bl_Filter == false
+    Bl_L_Filter := true
+    Bl_S_Filter := true
+
+//Plot baseline to chart
+plot(Bl, color=color.yellow)
+
+//==============================================================================
+//COMPLETE - USER INPUT CONDITIONS - Exit
+//==============================================================================
+//Allow user to select whether they would like to use C5 as exit
+Input_Exit = input(true, title='Use Exit Indicator?')
+
+if Input_Exit == false
+    Exit_L := false
+    Exit_S := false
+
+//==============================================================================
+//COMPLETE - CONTINUATION TRADES
+//==============================================================================
+//Allow user to select whether they would like to use Continuation Trades
+Input_Cont = input(false, title='Use Continuation Trades?')
+
+//Counter for Continuation Trade signals
+Count_Cont = float(0.0)
+//if there is a cross of the baseline and price, reset counter
+if ta.cross(close, Bl)
+    Count_Cont := 0
+//if there is a new trade found, add 1 to the counter
+else if strategy.position_size != 0 and strategy.position_size[1] == 0
+    Count_Cont := Count_Cont[1] + 1
+//if a trade is fully closed, add 1 to the counter
+else if strategy.position_size[1] != 0 and strategy.position_size == 0
+    Count_Cont := Count_Cont[1] + 1
+//if none of the above is true, counter is equal to the previous candle counter value
+else
+    Count_Cont := Count_Cont[1]
+
+//Continuation Trade counter as filter - Trades taken only when Counter equals 2
+Ind_Cont_Filter = Input_Cont and Count_Cont == 2
+
+//Plot continuation trade counter and signals
+plotchar(Input_Cont and Count_Cont == 0 ? true : false, color = na, text = '0')
+plotchar(Input_Cont and Count_Cont == 1 ? true : false, color = na, text = '1')
+plotchar(Input_Cont and Count_Cont == 2 ? true : false, color = na, text = '2')
+plotchar(Input_Cont and Count_Cont >= 3 ? true : false, color = na, text = '3')
+
+//==============================================================================
+//COMPLETE - ONE CANDLE RULE
+//==============================================================================
+//Allow user to select whether they would like to use Once Candle Rule
+Input_OCR = input(false,title='Use One Candle Rule?')
+
+if Input_OCR and C1_L_Trigger[1] == true and C1_L_Trigger[2] ==false
+    C1_L_Trigger:= true
+
+if Input_OCR and C1_S_Trigger[1] == true and C1_S_Trigger[2] ==false
+    C1_S_Trigger:= true
+
+//==============================================================================
+//COMPLETE - BRIDGE TOO FAR
+//==============================================================================
+//Allow user to select whether they would like to use Bridge Too Far Nuance
+Input_Btf_Filter = input(defval = false, title='Use Bridge Too Far Rule?')
+Input_Btf_Range  = input(defval = 7,     title='Bridge Too Far Range')
+
+//Counter for Bridge Too Far nuance
+Count_Btf  = float(0.0)
+//if there is a cross of indicator 1 for long or short trades, reset counter
+if C1_L_Trigger or C1_S_Trigger
+    Count_Btf := 0
+//if there is not a cross, then add 1 to the counter
+else
+    Count_Btf := Count_Btf[1] + 1
+
+//Bridge Too Far counter as filter - Trades taken only when Counter is less than Range
+Btf_Filter = true
+if Input_Btf_Filter and Count_Btf >= Input_Btf_Range
+    Btf_Filter :=  false
+
+//Plot continuation trade counter and signals
+plotshape(Btf_Filter and Input_Btf_Filter, style = shape.circle, color = color.fuchsia)
+
+//==============================================================================
+//COMPLETE - BASELINE AND ATR RULE
+//==============================================================================
+//Allow user to select whether they would like to use ATR range from BL Nuance
+Input_Bl_Atr       = input(defval = false, title='Use Baseline ATR Rule?')
+Input_Bl_Atr_Multi = input(defval = 1.0,  title='Baseline ATR Multiple')
+
+//Calculate ATR range from BL
+Bl_Atr_U = Bl + Input_Bl_Atr_Multi * Atr
+Bl_Atr_L = Bl - Input_Bl_Atr_Multi * Atr
+
+Bl_Atr_Filter = true
+if Input_Bl_Atr == true and (close > Bl_Atr_U or close < Bl_Atr_L)
+    Bl_Atr_Filter := false
+
+//Plot baseline to chart
+plot(Input_Bl_Atr ? Bl_Atr_U : na, color=color.rgb(255, 235, 59, 50))
+plot(Input_Bl_Atr ? Bl_Atr_L : na, color=color.rgb(255, 235, 59, 50))
+
+//==============================================================================
+//COMPLETE - ENTRY CONDITIONS
+//==============================================================================
+//Insert Long and Short conditions for C1 Trigger, all other indicators are filters
+Condition_L_1 = strategy.position_size <= 0 and Date_Range() and C1_L_Trigger and C2_L_Filter and Vol_L_Filter and Bl_L_Filter and Bl_Atr_Filter
+Condition_S_1 = strategy.position_size >= 0 and Date_Range() and C1_S_Trigger and C2_S_Filter and Vol_L_Filter and Bl_S_Filter and Bl_Atr_Filter
+
+//Plot long and short conditions
+plotshape(Condition_L_1, color=color.orange, style=shape.labelup,   location=location.belowbar)
+plotshape(Condition_S_1, color=color.orange, style=shape.labeldown, location=location.abovebar)
+
+//Insert Long and Short conditions for BL Trigger, all other indicators are filters
+Condition_L_2 = strategy.position_size <= 0 and Date_Range() and C1_L_Filter and C2_L_Filter and Vol_L_Filter and Bl_L_Trigger and Btf_Filter and Bl_Atr_Filter
+Condition_S_2 = strategy.position_size >= 0 and Date_Range() and C1_S_Filter and C2_S_Filter and Vol_S_Filter and Bl_S_Trigger and Btf_Filter and Bl_Atr_Filter
+
+//Plot long and short conditions
+plotshape(Condition_L_2, color=color.teal, style=shape.labelup,   location=location.belowbar)
+plotshape(Condition_S_2, color=color.teal, style=shape.labeldown, location=location.abovebar)
+
+//Insert Long and Short conditions for Coninuation Trades, all other indicators are filters
+Condition_L_3 = strategy.position_size <= 0 and Date_Range() and Cont_L_Trigger and C2_L_Filter and Bl_L_Filter and Ind_Cont_Filter
+Condition_S_3 = strategy.position_size >= 0 and Date_Range() and Cont_S_Trigger and C2_S_Filter and Bl_S_Filter and Ind_Cont_Filter
+
+//Plot long and short conditions
+plotshape(Condition_L_3, color=color.purple, style=shape.labelup,   location=location.belowbar)
+plotshape(Condition_S_3, color=color.purple, style=shape.labeldown, location=location.abovebar)
+
+//==============================================================================
+//COMPLETE - ENTRY ORDERS
+//==============================================================================
+//Compile all long and short entry conditions
+Entry_Long  = Condition_L_1 or Condition_L_2 or Condition_L_3
+Entry_Short = Condition_S_1 or Condition_S_2 or Condition_S_3
+
+//Submit long and short orders based on entry conditions
+if Entry_Long
+    strategy.entry(id='Entry_L_1', comment = "Long Entry 1",  direction=strategy.long,  qty=Position_Size/2)
+    strategy.entry(id='Entry_L_2', comment = "Long Entry 2",  direction=strategy.long,  qty=Position_Size/2)
+    
+if Entry_Short
+    strategy.entry(id='Entry_S_1', comment = "Short Entry 1", direction=strategy.short, qty=Position_Size/2)
+    strategy.entry(id='Entry_S_2', comment = "Short Entry 2", direction=strategy.short, qty=Position_Size/2)
+
+//==============================================================================
+//COMPLETE - TAKE PROFIT AND STOP LOSS CONDITIONS
+//==============================================================================
+//Store Price on new entry signal
+Entry_Price = strategy.opentrades.entry_price(strategy.opentrades - 1)
+
+//Store ATR value on new entry signal
+Entry_Atr = float(0.0)
+if strategy.position_size == 0 or Entry_Long or Entry_Short
+    Entry_Atr := Atr
+else
+    Entry_Atr := Entry_Atr[1]
+
+//Calculate stop loss and take profit distance (in price)
+Risk_Profit = Entry_Atr * Atr_Multi_Profit
+Risk_Loss   = Entry_Atr * Atr_Multi_Loss 
+
+//For Long Trades, find the profit level
+Profit_L = float(0.0)
+if strategy.position_size >= 0 and strategy.opentrades == 2
+    Profit_L := Entry_Price + Risk_Profit
+else
+    Profit_L := na
+
+//For Long Trades, find the stop loss level
+Stop_L = float(0.0)
+if strategy.position_size >= 0
+    if strategy.opentrades == 2 or Entry_Long
+        Stop_L := Entry_Price - Risk_Loss
+    else if strategy.opentrades == 1
+        Stop_L := math.max(nz(Stop_L[1], 0), close - Risk_Loss, Entry_Price + 0.001)
+    else
+        Stop_L := na
+else
+    Stop_L := na
+
+//For Short Trades, find the profit level
+Profit_S = float(0.0)
+if strategy.position_size <= 0 and strategy.opentrades == 2
+    Profit_S := Entry_Price - Risk_Profit
+else
+    Profit_S := na
+
+//For Short Trades, find the stop loss level
+Stop_S = float(0.0)
+if strategy.position_size <= 0
+    if strategy.opentrades == 2 or Entry_Short
+        Stop_S := Entry_Price + Risk_Loss
+    else if strategy.opentrades == 1
+        Stop_S := math.min(nz(Stop_S[1], 10000000), close + Risk_Loss, Entry_Price - 0.001)
+    else
+        Stop_S := na
+else
+    Stop_S := na
+
+//Plot profit and stop loss levels for long and short trades
+plot(Profit_L, color=color.lime, style=plot.style_linebr, linewidth=2)
+plot(Stop_L,   color=color.red,  style=plot.style_linebr, linewidth=2)
+plot(Profit_S, color=color.lime, style=plot.style_linebr, linewidth=2)
+plot(Stop_S,   color=color.red,  style=plot.style_linebr, linewidth=2)
+
+//==============================================================================
+//COMPLETE - EXIT ORDERS
+//==============================================================================
+//Exit long trades
+strategy.exit(id = 'Exit_L_1', from_entry ='Entry_L_1', comment='Long Exit 1',  stop = Stop_L, limit = Profit_L)
+strategy.exit(id = 'Exit_L_2', from_entry ='Entry_L_2', comment='Long Exit 2',  stop = Stop_L, limit = na)
+
+//Exit short trades
+strategy.exit(id = 'Exit_S_1', from_entry ='Entry_S_1', comment='Short Exit 1', stop = Stop_S, limit = Profit_S)
+strategy.exit(id = 'Exit_S_2', from_entry ='Entry_S_2', comment='Short Exit 2', stop = Stop_S, limit = na)
+
+//==============================================================================
+//COMPLETE - CLOSE ORDERS
+//==============================================================================
+//Close long trades
+if Exit_L == true
+    strategy.close(id='Entry_L_1', comment='Long Close 1')
+    strategy.close(id='Entry_L_2', comment='Long Close 2')
+
+//Close short trades
+if Exit_S == true
+    strategy.close(id='Entry_S_1', comment='Short Close 1')
+    strategy.close(id='Entry_S_2', comment='Short Close 2')
+
+//==============================================================================
