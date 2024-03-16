@@ -1,0 +1,90 @@
+//---------------------------------------------//
+// This source code is subject to the terms of 
+// the Mozilla Public License 2.0 at 
+// https://mozilla.org/MPL/2.0/
+// © Dillon_Grech
+//---------------------------------------------//
+
+//---------------------------------------------//
+// Simple Moving Average Strategy which takes
+// trades based off Moving Average Cross and
+// exits on oposite condition. User can select
+// the type of moving average they wish to use.
+//---------------------------------------------//
+
+//@version=5
+strategy(title="Advance MA Cross", overlay=true)
+//---------------------------------------------//
+
+//---------------------------------------------//
+//Create Moving Average Function
+ma_function (ma_type, ma_length) => 
+    switch ma_type
+        "EMA" => ta.ema(close, ma_length)
+        "SMA" => ta.sma(close, ma_length)
+        "RMA" => ta.rma(close, ma_length)
+        "WMA" => ta.wma(close, ma_length)
+        =>
+            runtime.error("No MA type found.")
+            float(na)
+//---------------------------------------------//
+
+//---------------------------------------------//
+//Declare Moving Average Inputs
+string ma_type_fast = input.string(
+   "EMA",
+   "MA Type Fast",
+   options = ["EMA", "SMA", "RMA", "WMA"])
+
+string ma_type_slow = input.string(
+   "EMA",
+   "MA Type Slow",
+   options = ["EMA", "SMA", "RMA", "WMA"])
+
+int ma_length_fast = input.int(
+   50,
+   "MA length",
+   minval = 2)
+
+int ma_length_slow = input.int(
+   200,
+   "MA length",
+   minval = 2)
+//---------------------------------------------//
+
+//---------------------------------------------//
+//Run MA Function and Get Signals
+float ma_fast = ma_function(
+   ma_type_fast, 
+   ma_length_fast)
+plot(ma_fast, "EMA", color.white, 2)
+
+float ma_slow = ma_function(
+   ma_type_slow,
+   ma_length_slow)
+plot(ma_slow, "EMA", color.yellow, 2)
+
+Ind_1_L=ta.crossover(ma_fast, ma_slow)
+Ind_1_S=ta.crossunder(ma_fast, ma_slow) 
+//---------------------------------------------//
+
+//---------------------------------------------//
+//ENTRY CONDITIONS
+entry_long=strategy.position_size<=0 and Ind_1_L
+entry_short=strategy.position_size>=0 and Ind_1_S
+
+plotshape(entry_long, "Long Entry", 
+   shape.arrowup, location.belowbar, color.lime,
+   0, "Buy")
+
+plotshape(entry_short, "Short Entry", 
+   shape.arrowdown, location.abovebar, color.red,
+   0, "Sell")
+
+if(entry_long)
+    strategy.entry("Long Entry", strategy.long,
+       1)
+if(entry_short)
+    strategy.entry("Short Entry", strategy.short,
+       1)
+//---------------------------------------------//
